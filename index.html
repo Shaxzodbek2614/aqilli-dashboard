@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qo'l Boshqaruvi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #06070c;
+    --ink: #eef1ff;
+    --muted: #8b90a8;
+    --glass: rgba(255,255,255,.06);
+    --glass-2: rgba(255,255,255,.1);
+    --line: rgba(255,255,255,.12);
+    --cyan: #3ee8ff;
+    --violet: #8b5cff;
+    --pink: #ff4fa3;
+    --lime: #b6ff4f;
+    --amber: #ffb547;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+
+  /* ---------- background ---------- */
+  .aurora { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+  .aurora span {
+    position: absolute; width: 55vmax; height: 55vmax; border-radius: 50%;
+    filter: blur(90px); opacity: .28; mix-blend-mode: screen;
+    animation: drift 22s ease-in-out infinite alternate;
+  }
+  .aurora span:nth-child(1) { background: var(--violet); left: -15vmax; top: -20vmax; }
+  .aurora span:nth-child(2) { background: var(--cyan); right: -20vmax; top: 10vmax; animation-duration: 28s; opacity: .18; }
+  .aurora span:nth-child(3) { background: var(--pink); left: 20vmax; bottom: -30vmax; animation-duration: 34s; opacity: .16; }
+  @keyframes drift { to { transform: translate(8vmax, 6vmax) scale(1.15); } }
+  .grid {
+    position: fixed; inset: 0; z-index: 0;
+    background-image: radial-gradient(rgba(255,255,255,.07) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
+  }
+
+  /* ---------- camera ---------- */
+  #video {
+    position: fixed; z-index: 1; transform: scaleX(-1); object-fit: cover; pointer-events: none;
+    transition: all .5s cubic-bezier(.2,.8,.2,1);
+  }
+  #video.mini {
+    right: 16px; bottom: 16px; width: 200px; height: 112px; border-radius: 14px;
+    border: 1px solid var(--line); opacity: .85; box-shadow: 0 10px 40px rgba(0,0,0,.5);
+  }
+  #video.bg {
+    inset: 0; width: 100%; height: 100%; border-radius: 0; opacity: .22;
+    filter: grayscale(1) contrast(1.1); transform: scaleX(-1) scale(var(--gain));
+  }
+  #video.hidden { opacity: 0; }
+
+  /* ---------- cards ---------- */
+  #stage { position: fixed; inset: 0; z-index: 2; }
+  .card {
+    position: absolute; left: 0; top: 0; width: 250px; padding: 18px 18px 20px;
+    border-radius: 22px; background: linear-gradient(160deg, var(--glass-2), var(--glass));
+    border: 1px solid var(--line);
+    backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+    box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08);
+    transform-origin: center; will-change: transform; cursor: grab;
+    transition: box-shadow .25s, border-color .25s;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px;
+    background: linear-gradient(135deg, var(--accent), transparent 55%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude; opacity: .55; transition: opacity .25s;
+  }
+  .card.hover { border-color: rgba(255,255,255,.28); box-shadow: 0 0 0 1px var(--accent), 0 0 40px -6px var(--accent), 0 16px 40px rgba(0,0,0,.45); }
+  .card.hover::before { opacity: 1; }
+  .card.grabbed { cursor: grabbing; box-shadow: 0 0 0 1.5px var(--accent), 0 0 70px -8px var(--accent), 0 40px 80px rgba(0,0,0,.6); }
+  .card.grabbed::before { opacity: 1; }
+  .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .chip {
+    font-size: 12px; font-weight: 600; letter-spacing: .02em; padding: 5px 10px; border-radius: 999px;
+    background: rgba(255,255,255,.07); border: 1px solid var(--line); color: #dfe3f5;
+  }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  .big { font-size: 46px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+  .big small { font-size: 18px; font-weight: 600; color: var(--muted); margin-left: 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .eq { display: flex; align-items: flex-end; gap: 3px; height: 34px; margin-top: 14px; }
+  .eq i { width: 5px; border-radius: 3px; background: var(--accent); animation: eq 1s ease-in-out infinite alternate; }
+  @keyframes eq { from { height: 15%; } to { height: 100%; } }
+  .todo { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; font-size: 14px; }
+  .todo li { display: flex; gap: 10px; align-items: center; }
+  .todo b { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--line); flex: none; }
+  .todo li.done { color: var(--muted); text-decoration: line-through; }
+  .todo li.done b { background: var(--accent); border-color: var(--accent); }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--pink), var(--violet)); display: grid; place-items: center; font-weight: 700; flex: none; }
+  .msg { font-size: 13.5px; line-height: 1.45; color: #cfd3e6; }
+  .msg strong { color: var(--ink); display: block; font-size: 14px; }
+  .trend { color: var(--lime); font-weight: 700; font-size: 14px; }
+  svg.spark { width: 100%; height: 48px; margin-top: 10px; overflow: visible; }
+
+  /* ---------- hand canvas ---------- */
+  #hands { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
+
+  /* ---------- HUD ---------- */
+  .hud { position: fixed; z-index: 6; left: 24px; top: 20px; pointer-events: none; }
+  .hud h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
+  .hud h1 em { font-style: normal; background: linear-gradient(90deg, var(--cyan), var(--violet), var(--pink)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .pills { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .pill {
+    font: 500 11.5px "JetBrains Mono", monospace; padding: 5px 10px; border-radius: 999px;
+    background: rgba(10,12,20,.6); border: 1px solid var(--line); color: var(--muted); backdrop-filter: blur(8px);
+  }
+  .pill b { color: var(--ink); font-weight: 500; }
+  .pill.ok b { color: var(--lime); }
+  .controls { position: fixed; z-index: 6; right: 24px; top: 20px; display: flex; gap: 8px; }
+  .btn {
+    font: 600 13px Inter, sans-serif; color: var(--ink); cursor: pointer;
+    padding: 9px 14px; border-radius: 12px; background: rgba(255,255,255,.07); border: 1px solid var(--line);
+    backdrop-filter: blur(10px); transition: background .2s;
+  }
+  .btn:hover { background: rgba(255,255,255,.14); }
+  .hints {
+    position: fixed; z-index: 6; left: 50%; bottom: 22px; transform: translateX(-50%);
+    display: flex; gap: 6px; padding: 6px; border-radius: 16px;
+    background: rgba(10,12,20,.55); border: 1px solid var(--line); backdrop-filter: blur(12px);
+    pointer-events: none; max-width: calc(100vw - 32px); flex-wrap: wrap; justify-content: center;
+  }
+  .hints span { font-size: 13px; padding: 7px 12px; border-radius: 11px; color: #cfd3e6; white-space: nowrap; }
+  .hints span.active { background: rgba(255,255,255,.1); color: #fff; }
+  .nohand {
+    position: fixed; z-index: 4; left: 50%; top: 50%; transform: translate(-50%,-50%);
+    font-size: 15px; color: var(--muted); pointer-events: none; transition: opacity .4s; opacity: 0;
+    text-align: center;
+  }
+  .nohand .em { font-size: 54px; display: block; animation: wave 1.6s ease-in-out infinite; transform-origin: 70% 80%; }
+  @keyframes wave { 0%,100% { transform: rotate(0); } 25% { transform: rotate(18deg); } 75% { transform: rotate(-12deg); } }
+  .toast {
+    position: fixed; z-index: 7; left: 50%; top: 18%; transform: translate(-50%, -20px) scale(.9);
+    font-size: 44px; font-weight: 800; letter-spacing: -.02em; opacity: 0; pointer-events: none;
+    transition: all .45s cubic-bezier(.2,1.4,.3,1);
+    text-shadow: 0 0 40px rgba(139,92,255,.7);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+
+  /* ---------- start overlay ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px;
+    background: radial-gradient(ellipse at center, rgba(6,7,12,.75), rgba(6,7,12,.96));
+    backdrop-filter: blur(6px); transition: opacity .5s;
+  }
+  .overlay.gone { opacity: 0; pointer-events: none; }
+  .panel { max-width: 460px; text-align: center; }
+  .panel .logo { font-size: 64px; margin-bottom: 10px; }
+  .panel h2 { font-size: 34px; margin: 0 0 10px; letter-spacing: -.03em; }
+  .panel p { color: var(--muted); line-height: 1.6; margin: 0 0 26px; }
+  .cta {
+    font: 700 16px Inter, sans-serif; color: #07080d; cursor: pointer; border: 0;
+    padding: 15px 28px; border-radius: 14px; background: linear-gradient(90deg, var(--cyan), #a78bff);
+    box-shadow: 0 10px 40px -8px rgba(62,232,255,.6); transition: transform .2s;
+  }
+  .cta:hover { transform: translateY(-2px); }
+  .cta:disabled { opacity: .6; cursor: progress; }
+  .link { display: block; margin: 16px auto 0; background: none; border: 0; color: var(--muted); cursor: pointer; font: 500 13px Inter; text-decoration: underline; }
+  .err { color: #ff8a8a; font-size: 14px; margin-top: 16px; min-height: 1em; }
+
+  @media (max-width: 640px) {
+    .card { width: 200px; padding: 14px; }
+    .big { font-size: 36px; }
+    .hud h1 { font-size: 18px; }
+    .controls { top: auto; bottom: 80px; right: 16px; }
+    .hud { left: 16px; }
+  }
+</style>
+</head>
+<body>
+  <div class="aurora"><span></span><span></span><span></span></div>
+  <div class="grid"></div>
+
+  <video id="video" class="mini hidden" playsinline muted></video>
+
+  <div id="stage">
+    <div class="card" style="--accent: var(--cyan)">
+      <div class="card-top"><span class="chip">☀️ Ob-havo</span><span class="pulse"></span></div>
+      <div class="big">18°<small>C</small></div>
+      <div class="sub">Toshkent · Ochiq osmon · Shamol 3 m/s</div>
+    </div>
+
+    <div class="card" style="--accent: var(--pink)">
+      <div class="card-top"><span class="chip">🎧 Musiqa</span><span class="pulse"></span></div>
+      <div class="msg"><strong>Tungi shahar</strong>Lo-fi · 3:42</div>
+      <div class="eq">
+        <i style="animation-delay:-.1s"></i><i style="animation-delay:-.5s"></i><i style="animation-delay:-.3s"></i>
+        <i style="animation-delay:-.8s"></i><i style="animation-delay:-.2s"></i><i style="animation-delay:-.6s"></i>
+        <i style="animation-delay:-.4s"></i><i style="animation-delay:-.9s"></i><i style="animation-delay:-.15s"></i>
+        <i style="animation-delay:-.7s"></i><i style="animation-delay:-.35s"></i><i style="animation-delay:-.55s"></i>
+        <i style="animation-delay:-.25s"></i><i style="animation-delay:-.85s"></i><i style="animation-delay:-.45s"></i>
+      </div>
+    </div>
+
+    <div class="card" style="--accent: var(--lime)">
+      <div class="card-top"><span class="chip">✅ Vazifalar</span><span class="pulse"></span></div>
+      <ul class="todo">
+        <li class="done"><b></b>Dizayn tayyorlash</li>
+        <li class="done"><b></b>Kamera ulash</li>
+        <li><b></b>Qo'l bilan boshqarish</li>
+        <li><b></b>Demo ko'rsatish</li>
+      </ul>
+    </div>
+
+    <div class="card" style="--accent: var(--violet)">
+      <div class="card-top"><span class="chip">📈 Statistika</span><span class="trend">+24%</span></div>
+      <div class="big">12.4k</div>
+      <svg class="spark" viewBox="0 0 200 48" preserveAspectRatio="none">
+        <defs><linearGradient id="sg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#8b5cff" stop-opacity=".5"/><stop offset="1" stop-color="#8b5cff" stop-opacity="0"/></linearGradient></defs>
+        <path d="M0 40 L20 34 L40 37 L60 26 L80 30 L100 18 L120 22 L140 12 L160 16 L180 6 L200 9 L200 48 L0 48Z" fill="url(#sg)"/>
+        <path d="M0 40 L20 34 L40 37 L60 26 L80 30 L100 18 L120 22 L140 12 L160 16 L180 6 L200 9" fill="none" stroke="#a78bff" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+      </svg>
+    </div>
+
+    <div class="card" style="--accent: var(--amber)">
+      <div class="card-top"><span class="chip">📅 Taqvim</span><span class="pulse"></span></div>
+      <div class="big" id="day">15</div>
+      <div class="sub" id="date">Noyabr · Yakshanba</div>
+      <div class="sub" style="color:#ffd79a">19:00 — Jamoa uchrashuvi</div>
+    </div>
+
+    <div class="card" style="--accent: #4fa3ff">
+      <div class="card-top"><span class="chip">💬 Xabarlar</span><span class="chip" style="padding:3px 8px">3</span></div>
+      <div class="row">
+        <div class="avatar">A</div>
+        <div class="msg"><strong>Aziz</strong>Sayt zo'r chiqibdi! Qo'l bilan qanday ishlaydi? 🔥</div>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="hands"></canvas>
+
+  <div class="hud">
+    <h1><em>Qo'l</em> bilan boshqaruv</h1>
+    <div class="pills">
+      <span class="pill" id="pCam">Kamera: <b>o'chiq</b></span>
+      <span class="pill" id="pHands">Qo'llar: <b>0</b></span>
+      <span class="pill" id="pFps">FPS: <b>–</b></span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnBg" title="V tugmasi">🎥 Kamera fon</button>
+    <button class="btn" id="btnReset" title="R tugmasi">↺ Joylash</button>
+  </div>
+
+  <div class="nohand" id="nohand"><span class="em">✋</span>Qo'lingizni kameraga ko'rsating</div>
+  <div class="toast" id="toast">Salom! 👋</div>
+
+  <div class="hints">
+    <span id="hPinch">🤏 Chimdib ushlang</span>
+    <span id="hThrow">💨 Otib yuboring</span>
+    <span id="hTwo">🙌 Ikki qo'l — kattalashtirish / burish</span>
+    <span id="hWave">👋 Silkiting</span>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="panel">
+      <div class="logo">🖐️</div>
+      <h2>Qo'lingiz — sichqoncha</h2>
+      <p>Kamera qo'lingizni kuzatadi va ekranda uning nusxasi paydo bo'ladi. Bosh va ko'rsatkich barmoqni chimdib kartani ushlang, qo'lingizni silkitib salomlashing.</p>
+      <button class="cta" id="btnStart">Kamerani yoqish</button>
+      <button class="link" id="btnSkip">Kamerasiz, sichqoncha bilan sinash</button>
+      <div class="err" id="err"></div>
+    </div>
+  </div>
+
+<script type="module">
+import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+
+const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+const MODEL_LOCAL = "./models/hand_landmarker.task";
+const MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+
+// How much to "stretch" camera space so screen corners are easy to reach.
+const GAIN = 1.18;
+document.documentElement.style.setProperty("--gain", GAIN);
+
+// Pinch thresholds (thumb–index distance divided by palm size), with hysteresis.
+const PINCH_ON = 0.3, PINCH_OFF = 0.45;
+
+const $ = (id) => document.getElementById(id);
+const video = $("video"), canvas = $("hands"), ctx = canvas.getContext("2d");
+const body = document.createElement("canvas"), bctx = body.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  for (const c of [canvas, body]) { c.width = W * DPR; c.height = H * DPR; c.style.width = W + "px"; c.style.height = H + "px"; }
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  bctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  for (const c of cards) { c.w = c.el.offsetWidth; c.h = c.el.offsetHeight; }
+}
+
+// ---------- date card ----------
+{
+  const months = ["Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"];
+  const days = ["Yakshanba","Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba"];
+  const d = new Date();
+  $("day").textContent = d.getDate();
+  $("date").textContent = `${months[d.getMonth()]} · ${days[d.getDay()]}`;
+}
+
+// ---------- helpers ----------
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+class OneEuro {
+  constructor(minCutoff = 1.6, beta = 0.012, dCutoff = 1) { Object.assign(this, { minCutoff, beta, dCutoff }); this.reset(); }
+  reset() { this.x = null; this.dx = 0; this.t = 0; }
+  a(cutoff, dt) { const tau = 1 / (2 * Math.PI * cutoff); return 1 / (1 + tau / dt); }
+  filter(x, t) {
+    if (this.x === null) { this.x = x; this.t = t; return x; }
+    const dt = Math.max((t - this.t) / 1000, 1e-3); this.t = t;
+    this.dx += this.a(this.dCutoff, dt) * ((x - this.x) / dt - this.dx);
+    this.x += this.a(this.minCutoff + this.beta * Math.abs(this.dx), dt) * (x - this.x);
+    return this.x;
+  }
+}
+
+// ---------- cards ----------
+const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+const LIFT = 1.04;                       // small "picked up" scale, anchored at the grab point
+const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const rotScale = (v, deg, s) => {
+  const r = deg * D2R, cs = Math.cos(r), sn = Math.sin(r);
+  return { x: (v.x * cs - v.y * sn) * s, y: (v.x * sn + v.y * cs) * s };
+};
+
+const cards = [...document.querySelectorAll(".card")].map((el, i) => ({
+  el, i, x: 0, y: 0, vx: 0, vy: 0, w: 0, h: 0,
+  rot: 0, baseRot: 0, spin: 0, scale: 1, restScale: 1,
+  z: i + 1, grabbers: [], one: null, two: null, hist: [], wiggleT: -1e9,
+  accent: getComputedStyle(el).getPropertyValue("--accent").trim(),
+}));
+let zTop = cards.length + 1;
+
+let laidOut = false;
+function layout() {
+  if (!W || !H) return;
+  laidOut = true;
+  const n = cards.length, cols = W < 700 ? 2 : 3, rows = Math.ceil(n / cols);
+  const gx = Math.min(W / cols, 330), gy = Math.min((H - 160) / rows, 260);
+  cards.forEach((c, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    c.x = W / 2 + (col - (cols - 1) / 2) * gx + (Math.random() - .5) * 30;
+    c.y = H / 2 + 20 + (row - (rows - 1) / 2) * gy + (Math.random() - .5) * 24;
+    c.vx = c.vy = c.spin = 0; c.baseRot = c.rot = (Math.random() - .5) * 8; c.restScale = 1;
+  });
+}
+
+function bringToFront(c) { c.z = ++zTop; c.el.style.zIndex = c.z; }
+
+function hitCard(c, p, pad = 14) {
+  const L = rotScale({ x: p.x - c.x, y: p.y - c.y }, -c.rot, 1);
+  return Math.abs(L.x) <= c.w * c.scale / 2 + pad && Math.abs(L.y) <= c.h * c.scale / 2 + pad;
+}
+function cardAt(p) {
+  return [...cards].sort((a, b) => b.z - a.z).find((c) => hitCard(c, p)) || null;
+}
+
+/* Every grabber (a hand or the mouse) has a rigid "frame": a position, an angle and a size.
+   For a hand it comes from the palm (wrist + knuckles), which stays steady while the
+   fingertips pinch, so the card does not slip when the fingers move. */
+function frameOf(g) {
+  return g.isMouse ? { x: g.cursor.x, y: g.cursor.y, a: 0, s: 1 } : g.frame;
+}
+// Pin point P to the grabber's current frame.
+function attach(g, P) { g.ref = { f0: { ...frameOf(g) }, P: { x: P.x, y: P.y } }; }
+// Where the pinned point is now, and how much the grabber turned since pinning.
+function anchorOf(g) {
+  const f = frameOf(g), r = g.ref, da = f.a - r.f0.a, k = f.s / r.f0.s;
+  const o = rotScale({ x: r.P.x - r.f0.x, y: r.P.y - r.f0.y }, da * R2D, k);
+  return { x: f.x + o.x, y: f.y + o.y, da };
+}
+const currentPoint = (g) => (g.ref ? anchorOf(g) : g.cursor);
+
+function setupGrab(c) {
+  c.one = c.two = null;
+  if (c.grabbers.length === 1) {
+    const g = c.grabbers[0], P = currentPoint(g);
+    attach(g, P);
+    // grab point in the card's own (unrotated, unscaled) coordinates
+    c.one = { L: rotScale({ x: P.x - c.x, y: P.y - c.y }, -c.rot, 1 / c.scale), rot0: c.rot };
+  } else if (c.grabbers.length >= 2) {
+    const [ga, gb] = c.grabbers, a = currentPoint(ga), b = currentPoint(gb);
+    attach(ga, a); attach(gb, b);
+    c.two = {
+      a0: { x: a.x, y: a.y }, d0: Math.max(dist(a, b), 1), ang0: Math.atan2(b.y - a.y, b.x - a.x),
+      phi: 0, off: { x: c.x - a.x, y: c.y - a.y }, rot0: c.rot, scale0: c.scale,
+    };
+  }
+}
+function grab(c, g) {
+  if (c.grabbers.length >= 2) return false;
+  if (!c.grabbers.length) { c.vx = c.vy = c.spin = 0; c.hist.length = 0; }
+  c.grabbers.push(g); g.card = c; g.ref = null; bringToFront(c); setupGrab(c);
+  burst(g.cursor.x, g.cursor.y, c.accent, 18);
+  return true;
+}
+function release(g) {
+  const c = g.card; if (!c) return;
+  const wasTwo = c.grabbers.length >= 2;
+  c.grabbers = c.grabbers.filter((x) => x !== g); g.card = null; g.ref = null;
+  if (wasTwo) c.restScale = c.scale / LIFT;   // keep the size you stretched it to
+  if (!c.grabbers.length) throwCard(c);
+  setupGrab(c);
+}
+// Release velocity from the last ~80 ms of motion, so a flick throws the card.
+function throwCard(c) {
+  const h = c.hist, last = h[h.length - 1];
+  c.baseRot = c.rot;
+  if (!last) return;
+  let s = h[0];
+  for (let i = h.length - 1; i >= 0; i--) { s = h[i]; if (last.t - h[i].t >= 80) break; }
+  const dt = Math.max(last.t - s.t, 1) / 16.67;
+  c.vx = clamp((last.x - s.x) / dt, -70, 70);
+  c.vy = clamp((last.y - s.y) / dt, -70, 70);
+  c.spin = clamp((last.rot - s.rot) / dt, -12, 12);
+  c.hist.length = 0;
+}
+
+let lastStep = performance.now();
+function stepCards(now) {
+  const f = clamp((now - lastStep) / 16.67, 0.2, 3); lastStep = now;
+  for (const c of cards) {
+    if (c.grabbers.length === 1 && c.one) {
+      // Rigid: the grab point stays exactly under the fingers, and the card turns with the hand.
+      const A = anchorOf(c.grabbers[0]);
+      c.rot = c.one.rot0 + A.da * R2D;
+      c.scale = lerp(c.scale, c.restScale * LIFT, 0.25);
+      const o = rotScale(c.one.L, c.rot, c.scale);
+      c.x = A.x - o.x; c.y = A.y - o.y;
+    } else if (c.grabbers.length >= 2 && c.two) {
+      // Two hands: the card follows the line between the two pinch points
+      // (move = translate, spread = scale, turn = rotate).
+      const t = c.two, a = anchorOf(c.grabbers[0]), b = anchorOf(c.grabbers[1]);
+      t.phi += wrapPi(Math.atan2(b.y - a.y, b.x - a.x) - t.ang0 - t.phi);
+      const scale = clamp(t.scale0 * dist(a, b) / t.d0, 0.4, 3);
+      const o = rotScale(t.off, t.phi * R2D, scale / t.scale0);
+      c.scale = scale; c.rot = t.rot0 + t.phi * R2D;
+      c.x = a.x + o.x; c.y = a.y + o.y;
+    } else {
+      c.x += c.vx * f; c.y += c.vy * f;
+      const fr = Math.pow(0.935, f);
+      c.vx *= fr; c.vy *= fr;
+      c.baseRot += c.spin * f; c.spin *= Math.pow(0.9, f);
+      const hw = c.w * c.scale / 2, hh = c.h * c.scale / 2;
+      if (c.x < hw) { c.x = hw; c.vx = Math.abs(c.vx) * 0.6; }
+      if (c.x > W - hw) { c.x = W - hw; c.vx = -Math.abs(c.vx) * 0.6; }
+      if (c.y < hh) { c.y = hh; c.vy = Math.abs(c.vy) * 0.6; }
+      if (c.y > H - hh) { c.y = H - hh; c.vy = -Math.abs(c.vy) * 0.6; }
+      c.rot = c.baseRot;
+      c.scale = lerp(c.scale, c.restScale, 0.2);
+    }
+    if (c.grabbers.length) {
+      c.hist.push({ t: now, x: c.x, y: c.y, rot: c.rot });
+      while (c.hist.length > 2 && now - c.hist[0].t > 200) c.hist.shift();
+    }
+    const wt = (now - c.wiggleT) / 1000;
+    const wiggle = wt > 0 && wt < 1.4 ? Math.sin(wt * 18 + c.i) * 9 * Math.exp(-wt * 3) : 0;
+    const wy = wt > 0 && wt < 1.4 ? Math.sin(wt * 14 + c.i * 2) * 10 * Math.exp(-wt * 3) : 0;
+    c.el.style.transform =
+      `translate3d(${c.x - c.w / 2}px, ${c.y - c.h / 2 + wy}px, 0) rotate(${c.rot + wiggle}deg) scale(${c.scale})`;
+    c.el.classList.toggle("grabbed", c.grabbers.length > 0);
+  }
+}
+
+// ---------- mouse fallback (uses the same grab system) ----------
+const mouse = { cursor: { x: 0, y: 0 }, card: null, isMouse: true };
+addEventListener("pointerdown", (e) => {
+  if (e.target.closest(".btn, .overlay")) return;
+  mouse.cursor = { x: e.clientX, y: e.clientY };
+  const c = cardAt(mouse.cursor);
+  if (c) grab(c, mouse);
+});
+addEventListener("pointermove", (e) => { mouse.cursor = { x: e.clientX, y: e.clientY }; });
+addEventListener("pointerup", () => release(mouse));
+
+// ---------- particles ----------
+const particles = [];
+function burst(x, y, color, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = 1.5 + Math.random() * 4;
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, color, r: 1.5 + Math.random() * 2.5 });
+  }
+}
+function drawParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vx *= 0.94; p.vy *= 0.94; p.life -= 0.025;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r * p.life + .5, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ---------- hand tracking ----------
+let landmarker = null, lastVideoTime = -1, lastResult = null;
+const hands = { left: null, right: null };
+const COLORS = {
+  left:  { a: "#3ee8ff", b: "#8b5cff", glow: "rgba(62,232,255,.9)" },
+  right: { a: "#ff4fa3", b: "#8b5cff", glow: "rgba(255,79,163,.9)" },
+};
+
+function newHand(key) {
+  return {
+    key, pts: null, missing: 0, pinching: false, card: null, cursor: { x: 0, y: 0 }, ratio: 1,
+    filters: Array.from({ length: 21 }, () => [new OneEuro(), new OneEuro()]),
+    hist: [], lastWave: 0, trail: [], openSince: 0,
+    frame: null, ref: null, angRaw: null, ang: 0,
+    angF: new OneEuro(1.5, 0.8), sizeF: new OneEuro(0.8, 0.002),
+  };
+}
+
+function toScreen(lm) {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const s = Math.max(W / vw, H / vh), ox = (W - vw * s) / 2, oy = (H - vh * s) / 2;
+  let x = lm.x * vw * s + ox, y = lm.y * vh * s + oy;
+  x = W / 2 + (x - W / 2) * GAIN; y = H / 2 + (y - H / 2) * GAIN;
+  return { x: W - x, y, z: lm.z };
+}
+
+function handOpen(p) {
+  const palm = dist(p[0], p[9]);
+  return [8, 12, 16, 20].reduce((s, i) => s + dist(p[0], p[i]), 0) / 4 > palm * 1.55;
+}
+
+function detectWave(h, now) {
+  const p = h.pts;
+  if (h.pinching || !handOpen(p)) { h.hist.length = 0; return; }
+  h.hist.push({ t: now, x: p[9].x });
+  while (h.hist.length && now - h.hist[0].t > 1200) h.hist.shift();
+  const th = dist(p[0], p[9]) * 0.45;
+  let dir = 0, ext = h.hist[0]?.x ?? 0, flips = 0;
+  for (const s of h.hist) {
+    if (dir >= 0 && s.x > ext) ext = s.x;
+    else if (dir <= 0 && s.x < ext) ext = s.x;
+    if (dir >= 0 && ext - s.x > th) { if (dir) flips++; dir = -1; ext = s.x; }
+    else if (dir <= 0 && s.x - ext > th) { if (dir) flips++; dir = 1; ext = s.x; }
+  }
+  if (flips >= 2 && now - h.lastWave > 2500) {
+    h.lastWave = now; h.hist.length = 0;
+    onWave(h, now);
+  }
+}
+
+let toastTimer;
+function onWave(h, now) {
+  const t = $("toast");
+  t.textContent = h.key === "left" ? "Salom! 👋" : "Assalomu alaykum! 👋";
+  t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1600);
+  cards.forEach((c, i) => (c.wiggleT = now + i * 60));
+  const p = h.pts[9]; burst(p.x, p.y, COLORS[h.key].a, 40);
+  flash("hWave");
+}
+
+function flash(id) {
+  const el = $(id); el.classList.add("active");
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove("active"), 900);
+}
+
+// Palm frame: centre of wrist + knuckles, hand roll angle (unwrapped), and palm size.
+function palmFrame(h, now) {
+  const p = h.pts, ids = [0, 5, 9, 13, 17];
+  const x = ids.reduce((s, i) => s + p[i].x, 0) / 5, y = ids.reduce((s, i) => s + p[i].y, 0) / 5;
+  let vx = 0, vy = 0;
+  for (const i of [5, 9, 13, 17]) {
+    const dx = p[i].x - p[0].x, dy = p[i].y - p[0].y, n = Math.hypot(dx, dy) || 1;
+    vx += dx / n; vy += dy / n;
+  }
+  const raw = Math.atan2(vy, vx);
+  h.ang = h.angRaw === null ? raw : h.ang + wrapPi(raw - h.angRaw);
+  h.angRaw = raw;
+  const size = (dist(p[0], p[5]) + dist(p[0], p[9]) + dist(p[0], p[17]) + dist(p[5], p[17])) / 4;
+  return { x, y, a: h.angF.filter(h.ang, now), s: h.sizeF.filter(size, now) };
+}
+
+function updateHands(now) {
+  const seen = new Set();
+  if (lastResult) {
+    lastResult.landmarks.forEach((lms, i) => {
+      // Input video is not mirrored, so MediaPipe's label is flipped relative to the user.
+      const label = lastResult.handedness?.[i]?.[0]?.categoryName;
+      let key = label === "Left" ? "right" : "left";
+      if (seen.has(key)) key = key === "left" ? "right" : "left";
+      seen.add(key);
+      const h = (hands[key] ||= newHand(key));
+      if (!h.pts || h.missing > 0) h.filters.forEach((f) => (f[0].reset(), f[1].reset()));
+      h.missing = 0;
+      h.pts = lms.map((lm, j) => {
+        const s = toScreen(lm);
+        return { x: h.filters[j][0].filter(s.x, now), y: h.filters[j][1].filter(s.y, now), z: s.z };
+      });
+    });
+  }
+  for (const key of ["left", "right"]) {
+    const h = hands[key]; if (!h) continue;
+    if (!seen.has(key)) {
+      h.missing++;
+      if (h.missing > 12) { release(h); h.pinching = false; h.pts = null; h.hist.length = 0; }
+      continue;
+    }
+    const p = h.pts, palm = dist(p[0], p[9]);
+    h.ratio = dist(p[4], p[8]) / palm;
+    h.cursor = mid(p[4], p[8]);
+    h.frame = palmFrame(h, now);
+
+    if (!h.pinching && h.ratio < PINCH_ON) {
+      h.pinching = true; h.openSince = 0;
+      const c = cardAt(h.cursor);
+      if (c && grab(c, h)) flash(c.grabbers.length === 2 ? "hTwo" : "hPinch");
+      else burst(h.cursor.x, h.cursor.y, "rgba(255,255,255,.7)", 6);
+    } else if (h.pinching) {
+      // Release only after the fingers stay open for a moment (no accidental drops).
+      if (h.ratio > PINCH_OFF) {
+        h.openSince ||= now;
+        if (now - h.openSince > 70) {
+          h.pinching = false; h.openSince = 0;
+          const c = h.card;
+          release(h);
+          if (c && Math.hypot(c.vx, c.vy) > 12) flash("hThrow");
+        }
+      } else h.openSince = 0;
+    }
+    detectWave(h, now);
+  }
+}
+
+// ---------- hand drawing ----------
+const CHAINS = [[0, 1, 2, 3, 4], [0, 5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16], [0, 17, 18, 19, 20]];
+const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+const PALM = [0, 1, 2, 5, 9, 13, 17];
+
+function drawHand(h) {
+  const p = h.pts, col = COLORS[h.key], palm = dist(p[0], p[9]);
+  const w = palm * 0.24;
+
+  // 1) solid silhouette on an offscreen canvas (no overlap artifacts)
+  bctx.clearRect(0, 0, W, H);
+  const g = bctx.createLinearGradient(p[0].x, p[0].y, p[12].x, p[12].y);
+  g.addColorStop(0, col.b); g.addColorStop(1, col.a);
+  bctx.fillStyle = g; bctx.strokeStyle = g;
+  bctx.lineCap = "round"; bctx.lineJoin = "round";
+  bctx.beginPath();
+  PALM.forEach((i, k) => (k ? bctx.lineTo(p[i].x, p[i].y) : bctx.moveTo(p[i].x, p[i].y)));
+  bctx.closePath(); bctx.fill();
+  bctx.lineWidth = w * 1.15; bctx.stroke();
+  for (const chain of CHAINS) {
+    for (let k = 1; k < chain.length; k++) {
+      const a = p[chain[k - 1]], b = p[chain[k]];
+      const depth = clamp(1 - (b.z || 0) * 3, 0.7, 1.4);
+      bctx.lineWidth = w * (1.05 - k * 0.1) * (chain[1] === 1 ? 1.1 : 1) * depth;
+      bctx.beginPath(); bctx.moveTo(a.x, a.y); bctx.lineTo(b.x, b.y); bctx.stroke();
+    }
+  }
+
+  // 2) composite: glow + translucent body
+  ctx.save();
+  ctx.shadowColor = col.glow; ctx.shadowBlur = 36;
+  ctx.globalAlpha = 0.32; ctx.drawImage(body, 0, 0, W, H);
+  ctx.restore();
+
+  // 3) skeleton + joints
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(255,255,255,.75)"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (const [a, b] of BONES) { ctx.moveTo(p[a].x, p[a].y); ctx.lineTo(p[b].x, p[b].y); }
+  ctx.stroke();
+  for (let i = 0; i < 21; i++) {
+    const tip = i % 4 === 0 && i > 0;
+    ctx.beginPath(); ctx.arc(p[i].x, p[i].y, tip ? 5.5 : 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = tip ? col.a : "#fff";
+    ctx.shadowColor = col.glow; ctx.shadowBlur = tip ? 14 : 0;
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // 4) pinch cursor
+  const c = h.card && h.ref ? anchorOf(h) : h.cursor, open = clamp((h.ratio - PINCH_ON) / (PINCH_OFF + 0.4 - PINCH_ON), 0, 1);
+  ctx.save();
+  ctx.shadowColor = col.glow; ctx.shadowBlur = 18;
+  ctx.strokeStyle = col.a; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(c.x, c.y, 8 + open * 22, 0, Math.PI * 2); ctx.stroke();
+  if (h.pinching) {
+    ctx.fillStyle = col.a; ctx.beginPath(); ctx.arc(c.x, c.y, 7, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+
+  // 5) trail while dragging
+  h.trail.push({ x: c.x, y: c.y });
+  if (h.trail.length > 16 || !h.card) h.trail.shift();
+  if (h.card && h.trail.length > 2) {
+    ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+    for (let i = 1; i < h.trail.length; i++) {
+      const t = i / h.trail.length;
+      ctx.strokeStyle = col.a; ctx.globalAlpha = t * 0.5; ctx.lineWidth = t * 6;
+      ctx.beginPath(); ctx.moveTo(h.trail[i - 1].x, h.trail[i - 1].y); ctx.lineTo(h.trail[i].x, h.trail[i].y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+// ---------- main loop ----------
+let frames = 0, fpsT = performance.now();
+function loop(now) {
+  if (innerWidth !== W || innerHeight !== H) { resize(); if (!laidOut) layout(); }
+  if (landmarker && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+    lastVideoTime = video.currentTime;
+    try { lastResult = landmarker.detectForVideo(video, now); } catch (e) { console.warn(e); }
+    frames++;
+  }
+  if (landmarker && video.readyState >= 2) updateHands(now);
+
+  // hover highlighting
+  const pointers = Object.values(hands).filter((h) => h && h.pts);
+  for (const c of cards) {
+    const hov = !c.grabbers.length && pointers.some((h) => !h.card && hitCard(c, h.cursor));
+    c.el.classList.toggle("hover", hov);
+  }
+
+  stepCards(now);
+
+  ctx.clearRect(0, 0, W, H);
+  for (const h of pointers) drawHand(h);
+  drawParticles();
+
+  if (now - fpsT > 500) {
+    $("pFps").innerHTML = `FPS: <b>${landmarker ? Math.round(frames * 1000 / (now - fpsT)) : "–"}</b>`;
+    $("pHands").innerHTML = `Qo'llar: <b>${pointers.length}</b>`;
+    $("pHands").classList.toggle("ok", pointers.length > 0);
+    frames = 0; fpsT = now;
+  }
+  $("nohand").style.opacity = landmarker && !pointers.length ? 1 : 0;
+  requestAnimationFrame(loop);
+}
+
+// ---------- start ----------
+async function start() {
+  const btn = $("btnStart"), err = $("err");
+  btn.disabled = true; err.textContent = "";
+  try {
+    btn.textContent = "Kameraga ruxsat…";
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }, audio: false,
+    });
+    video.srcObject = stream;
+    await video.play();
+    btn.textContent = "Model yuklanmoqda…";
+    const fileset = await FilesetResolver.forVisionTasks(WASM);
+    const local = await fetch(MODEL_LOCAL, { method: "HEAD" }).then((r) => r.ok).catch(() => false);
+    const modelPath = local ? MODEL_LOCAL : MODEL;
+    const opts = (delegate) => ({
+      baseOptions: { modelAssetPath: modelPath, delegate },
+      runningMode: "VIDEO", numHands: 2,
+      minHandDetectionConfidence: 0.6, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5,
+    });
+    try { landmarker = await HandLandmarker.createFromOptions(fileset, opts("GPU")); }
+    catch { landmarker = await HandLandmarker.createFromOptions(fileset, opts("CPU")); }
+    video.classList.remove("hidden");
+    $("pCam").innerHTML = "Kamera: <b>yoniq</b>"; $("pCam").classList.add("ok");
+    $("overlay").classList.add("gone");
+  } catch (e) {
+    console.error(e);
+    btn.disabled = false; btn.textContent = "Qayta urinish";
+    err.textContent = e.name === "NotAllowedError"
+      ? "Kameraga ruxsat berilmadi. Brauzer sozlamalaridan ruxsat bering."
+      : "Xatolik: " + (e.message || e);
+  }
+}
+
+$("btnStart").onclick = start;
+$("btnSkip").onclick = () => $("overlay").classList.add("gone");
+const toggleBg = () => { video.classList.toggle("bg"); video.classList.toggle("mini"); };
+$("btnBg").onclick = toggleBg;
+$("btnReset").onclick = layout;
+addEventListener("keydown", (e) => {
+  if (e.key === "v" || e.key === "V") toggleBg();
+  if (e.key === "r" || e.key === "R") layout();
+});
+addEventListener("resize", () => { resize(); if (!laidOut) layout(); });
+
+resize();
+layout();
+cards.forEach((c) => (c.rot = c.baseRot, c.el.style.zIndex = c.z));
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
